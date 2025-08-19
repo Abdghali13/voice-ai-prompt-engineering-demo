@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Voice AI Backend
+  voice-ai-backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://voiceai:voiceai@postgres:5432/voice_ai_demo
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./.env:/app/.env
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=voice_ai_demo
+      - POSTGRES_USER=voiceai
+      - POSTGRES_PASSWORD=voiceai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+
+  # Frontend (if you want to add it later)
+  # frontend:
+  #   build: ./frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - REACT_APP_API_URL=http://localhost:8000
+  #   depends_on:
+  #     - voice-ai-backend
+  #   networks:
+  #     - voice-ai-network
+  #   restart: unless-stopped
+
+  # Nginx Reverse Proxy (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - voice-ai-backend
+    networks:
+      - voice-ai-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  voice-ai-network:
+    driver: bridge
